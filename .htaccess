@@ -1,0 +1,17 @@
+# Bảo vệ thư mục
+Options -Indexes
+
+# Rewrite rules
+RewriteEngine On
+RewriteRule ^$ index.html [L]
+
+# Bảo vệ file nhạy cảm
+<FilesMatch "\.(json|sql|log|ini)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Cấu hình upload
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
+php_value max_execution_time 300
