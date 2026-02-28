@@ -3379,5 +3379,1374 @@
         window.removePhoto = removePhoto;
         window.removeFile = removeFile;
     </script>
+    <script>
+    // ===== CẤU HÌNH =====
+    const API_URL = ''; // Để trống nếu chưa có backend
+
+    // ===== BIẾN TOÀN CỤC =====
+    let currentMemberId = null;
+    let currentDocumentId = null;
+    let currentPhotoFile = null;
+    let currentPhotoData = null;
+    let currentFiles = [];
+    let currentDocType = 'dinhky';
+    let currentBranch = 'all';
+    let members = [];
+    let documents = [];
+
+    // ===== KHỞI TẠO =====
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Trang đã sẵn sàng');
+        
+        // Khởi tạo tất cả các event listeners
+        initEventListeners();
+        
+        // Load logo từ localStorage
+        loadSavedLogo();
+        
+        // Hiển thị dashboard mặc định
+        showDashboard();
+        
+        // Load dữ liệu mẫu
+        loadSampleData();
+        
+        // Đảm bảo menu active đúng
+        setActiveMenu();
+    });
+
+    // ===== INIT EVENT LISTENERS =====
+    function initEventListeners() {
+        // Logo upload
+        const logoUpload = document.getElementById('logoUpload');
+        if (logoUpload) {
+            // Xóa event cũ để tránh trùng lặp
+            logoUpload.replaceWith(logoUpload.cloneNode(true));
+            document.getElementById('logoUpload').addEventListener('click', handleLogoUpload);
+        }
+
+        // Menu toggle
+        const documentsMenuToggle = document.getElementById('documentsMenuToggle');
+        if (documentsMenuToggle) {
+            documentsMenuToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('documentsSubmenu').classList.toggle('show');
+            });
+        }
+
+        const membersMenuToggle = document.getElementById('membersMenuToggle');
+        if (membersMenuToggle) {
+            membersMenuToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('membersSubmenu').classList.toggle('show');
+            });
+        }
+
+        // Main menu items
+        const dashboardMenu = document.getElementById('dashboardMenu');
+        if (dashboardMenu) {
+            dashboardMenu.addEventListener('click', function(e) {
+                e.preventDefault();
+                showDashboard();
+            });
+        }
+
+        // Documents submenu - QUAN TRỌNG: các mục con của văn bản
+        document.querySelectorAll('#documentsSubmenu .submenu-item').forEach(item => {
+            // Xóa event cũ
+            const newItem = item.cloneNode(true);
+            item.parentNode.replaceChild(newItem, item);
+            
+            newItem.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const type = this.getAttribute('data-type');
+                if (type) {
+                    // Cập nhật active class
+                    document.querySelectorAll('#documentsSubmenu .submenu-item').forEach(i => {
+                        i.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    
+                    // Cập nhật current type
+                    currentDocType = type;
+                    
+                    // Cập nhật tiêu đề
+                    updateDocumentTitleByType(type);
+                    
+                    // Lọc và hiển thị văn bản
+                    filterDocumentsByType(type);
+                    
+                    // Hiển thị trang documents
+                    showDocuments();
+                }
+            });
+        });
+
+        // Members submenu - QUAN TRỌNG: các mục con của đảng viên
+        document.querySelectorAll('#membersSubmenu .submenu-item').forEach(item => {
+            // Xóa event cũ
+            const newItem = item.cloneNode(true);
+            item.parentNode.replaceChild(newItem, item);
+            
+            newItem.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const branch = this.getAttribute('data-branch');
+                if (branch) {
+                    // Cập nhật active class
+                    document.querySelectorAll('#membersSubmenu .submenu-item').forEach(i => {
+                        i.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    
+                    // Cập nhật current branch
+                    currentBranch = branch;
+                    
+                    // Cập nhật tiêu đề
+                    updateMemberTitleByBranch(branch, this.textContent.trim());
+                    
+                    // Lọc và hiển thị đảng viên
+                    filterMembersByBranch(branch);
+                    
+                    // Hiển thị trang members
+                    showMembers();
+                }
+            });
+        });
+
+        // Other menu items
+        const shMenu = document.getElementById('shMenu');
+        if (shMenu) {
+            shMenu.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Chức năng Sinh hoạt Đảng đang phát triển');
+            });
+        }
+
+        const ptMenu = document.getElementById('ptMenu');
+        if (ptMenu) {
+            ptMenu.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Chức năng Công tác Phát triển Đảng đang phát triển');
+            });
+        }
+
+        const bcMenu = document.getElementById('bcMenu');
+        if (bcMenu) {
+            bcMenu.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Chức năng Báo cáo Thống kê đang phát triển');
+            });
+        }
+
+        const htMenu = document.getElementById('htMenu');
+        if (htMenu) {
+            htMenu.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Chức năng Hệ thống đang phát triển');
+            });
+        }
+
+        // Quick access
+        const addMemberBtn = document.getElementById('addMemberBtn');
+        if (addMemberBtn) {
+            addMemberBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                showMembers();
+                openAddMemberModal();
+            });
+        }
+
+        const addDocumentBtn = document.getElementById('addDocumentBtn');
+        if (addDocumentBtn) {
+            addDocumentBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                showDocuments();
+                openAddDocumentModal();
+            });
+        }
+
+        const pendingDocsBtn = document.getElementById('pendingDocsBtn');
+        if (pendingDocsBtn) {
+            pendingDocsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                showDocuments();
+                filterDocumentsByStatus('chopheduyet');
+            });
+        }
+
+        const docNotifications = document.getElementById('docNotifications');
+        if (docNotifications) {
+            docNotifications.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Có 2 văn bản mới cần xử lý');
+            });
+        }
+
+        // Action buttons
+        const createNewBtn = document.getElementById('createNewBtn');
+        if (createNewBtn) {
+            createNewBtn.addEventListener('click', () => {
+                openAddDocumentModal();
+            });
+        }
+
+        const exportReportBtn = document.getElementById('exportReportBtn');
+        if (exportReportBtn) {
+            exportReportBtn.addEventListener('click', () => {
+                alert('Chức năng Xuất báo cáo đang phát triển');
+            });
+        }
+
+        const addNewMemberBtn = document.getElementById('addNewMemberBtn');
+        if (addNewMemberBtn) {
+            addNewMemberBtn.addEventListener('click', () => {
+                openAddMemberModal();
+            });
+        }
+
+        const addNewDocumentBtn = document.getElementById('addNewDocumentBtn');
+        if (addNewDocumentBtn) {
+            addNewDocumentBtn.addEventListener('click', () => {
+                openAddDocumentModal();
+            });
+        }
+
+        const exportMembersBtn = document.getElementById('exportMembersBtn');
+        if (exportMembersBtn) {
+            exportMembersBtn.addEventListener('click', () => {
+                alert('Chức năng Xuất danh sách đảng viên đang phát triển');
+            });
+        }
+
+        const exportDocsBtn = document.getElementById('exportDocsBtn');
+        if (exportDocsBtn) {
+            exportDocsBtn.addEventListener('click', () => {
+                alert('Chức năng Xuất danh sách văn bản đang phát triển');
+            });
+        }
+
+        // Module cards
+        const goToDocuments = document.getElementById('goToDocuments');
+        if (goToDocuments) {
+            goToDocuments.addEventListener('click', () => {
+                showDocuments();
+            });
+        }
+
+        const goToMembers = document.getElementById('goToMembers');
+        if (goToMembers) {
+            goToMembers.addEventListener('click', () => {
+                showMembers();
+            });
+        }
+
+        const goToSh = document.getElementById('goToSh');
+        if (goToSh) {
+            goToSh.addEventListener('click', () => {
+                alert('Chức năng Sinh hoạt Đảng đang phát triển');
+            });
+        }
+
+        // Logout
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                if (confirm('Bạn có chắc chắn muốn đăng xuất?')) {
+                    alert('Đã đăng xuất');
+                }
+            });
+        }
+
+        // Footer links
+        const helpLink = document.getElementById('helpLink');
+        if (helpLink) {
+            helpLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Chức năng Trợ giúp đang phát triển');
+            });
+        }
+
+        const guideLink = document.getElementById('guideLink');
+        if (guideLink) {
+            guideLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Chức năng Hướng dẫn sử dụng đang phát triển');
+            });
+        }
+
+        const contactLink = document.getElementById('contactLink');
+        if (contactLink) {
+            contactLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Chức năng Liên hệ đang phát triển');
+            });
+        }
+
+        const policyLink = document.getElementById('policyLink');
+        if (policyLink) {
+            policyLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Chức năng Chính sách bảo mật đang phát triển');
+            });
+        }
+
+        // File upload
+        const photoUpload = document.getElementById('photoUpload');
+        if (photoUpload) {
+            photoUpload.addEventListener('change', handlePhotoUpload);
+        }
+
+        const fileUpload = document.getElementById('fileUpload');
+        if (fileUpload) {
+            fileUpload.addEventListener('change', handleFileUpload);
+        }
+
+        // Search
+        const searchMember = document.getElementById('searchMember');
+        if (searchMember) {
+            searchMember.addEventListener('keyup', debounce(handleMemberSearch, 500));
+        }
+
+        const searchDocument = document.getElementById('searchDocument');
+        if (searchDocument) {
+            searchDocument.addEventListener('keyup', debounce(handleDocumentSearch, 500));
+        }
+
+        // Filter
+        const docTypeFilter = document.getElementById('docTypeFilter');
+        if (docTypeFilter) {
+            docTypeFilter.addEventListener('change', handleDocTypeFilter);
+        }
+
+        // Close modal when clicking outside
+        window.addEventListener('click', (e) => {
+            const memberModal = document.getElementById('memberModal');
+            const docModal = document.getElementById('documentModal');
+            if (e.target === memberModal) closeMemberModal();
+            if (e.target === docModal) closeDocumentModal();
+        });
+    }
+
+    // ===== LOGO UPLOAD - LƯU VÀO LOCALSTORAGE =====
+    function handleLogoUpload() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.size > 2 * 1024 * 1024) {
+                    alert('Logo không được vượt quá 2MB');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const imageData = event.target.result;
+                    
+                    try {
+                        localStorage.setItem('partyLogo', imageData);
+                        applyLogo(imageData);
+                        alert('Đã lưu logo thành công!');
+                    } catch (e) {
+                        alert('Không thể lưu logo. Có thể file quá lớn.');
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        fileInput.click();
+    }
+
+    function loadSavedLogo() {
+        const savedLogo = localStorage.getItem('partyLogo');
+        if (savedLogo) {
+            applyLogo(savedLogo);
+        }
+    }
+
+    function applyLogo(imageData) {
+        const flagContainer = document.getElementById('logoUpload');
+        if (!flagContainer) return;
+        
+        // Kiểm tra xem đã có ảnh chưa
+        const existingImg = flagContainer.querySelector('img');
+        
+        if (existingImg) {
+            existingImg.src = imageData;
+        } else {
+            // Xóa flag cũ
+            flagContainer.innerHTML = '';
+            
+            // Tạo ảnh mới
+            const logoImg = document.createElement('img');
+            logoImg.src = imageData;
+            logoImg.style.width = '100%';
+            logoImg.style.height = '100%';
+            logoImg.style.objectFit = 'contain';
+            
+            flagContainer.appendChild(logoImg);
+            flagContainer.classList.add('has-logo');
+            
+            // Thêm overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'logo-overlay';
+            overlay.innerHTML = '<i class="fas fa-upload"></i> Thay đổi logo';
+            flagContainer.appendChild(overlay);
+        }
+    }
+
+    // ===== MENU FUNCTIONS =====
+    function updateDocumentTitleByType(type) {
+        const titles = {
+            'dinhky': { title: 'NGHỊ QUYẾT ĐỊNH KỲ', subtitle: 'Các nghị quyết định kỳ của Đảng ủy' },
+            'chuyende': { title: 'NGHỊ QUYẾT CHUYÊN ĐỀ', subtitle: 'Các nghị quyết chuyên đề' },
+            'quytrinh': { title: 'QUY TRÌNH XỬ LÝ', subtitle: 'Các quy trình, hướng dẫn nghiệp vụ' },
+            'luutru': { title: 'KHO LƯU TRỮ', subtitle: 'Các văn bản đã lưu trữ' }
+        };
+
+        const pageTitle = document.getElementById('documentsPageTitle');
+        const pageSubtitle = document.getElementById('documentsPageSubtitle');
+        const tableTitle = document.getElementById('documentTableTitle');
+        
+        if (pageTitle) pageTitle.innerText = 'QUẢN LÝ VĂN BẢN, NGHỊ QUYẾT';
+        if (pageSubtitle) pageSubtitle.innerText = titles[type]?.subtitle || '';
+        if (tableTitle) tableTitle.innerText = 'DANH SÁCH ' + (titles[type]?.title || '');
+    }
+
+    function updateMemberTitleByBranch(branch, branchName) {
+        const pageTitle = document.getElementById('membersPageTitle');
+        const pageSubtitle = document.getElementById('membersPageSubtitle');
+        const tableTitle = document.getElementById('tableTitle');
+        
+        if (pageTitle) pageTitle.innerText = 'DANH SÁCH ĐẢNG VIÊN';
+        if (pageSubtitle) pageSubtitle.innerText = branch === 'all' ? 'Tất cả các chi bộ' : branchName;
+        if (tableTitle) tableTitle.innerText = 'DANH SÁCH ĐẢNG VIÊN' + (branch !== 'all' ? ' - ' + branchName.toUpperCase() : '');
+    }
+
+    function setActiveMenu() {
+        // Xác định trang hiện tại và set active menu
+        if (document.getElementById('dashboardContent').classList.contains('active')) {
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+            document.getElementById('dashboardMenu')?.classList.add('active');
+        } else if (document.getElementById('membersContent').classList.contains('active')) {
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+            document.getElementById('membersMenuToggle')?.classList.add('active');
+        } else if (document.getElementById('documentsContent').classList.contains('active')) {
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+            document.getElementById('documentsMenuToggle')?.classList.add('active');
+        }
+    }
+
+    // ===== PAGE NAVIGATION =====
+    function showDashboard() {
+        document.getElementById('dashboardContent').classList.add('active');
+        document.getElementById('membersContent').classList.remove('active');
+        document.getElementById('documentsContent').classList.remove('active');
+        document.getElementById('documentDetailContent').classList.remove('active');
+
+        document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+        document.getElementById('dashboardMenu').classList.add('active');
+    }
+
+    function showMembers() {
+        document.getElementById('membersContent').classList.add('active');
+        document.getElementById('dashboardContent').classList.remove('active');
+        document.getElementById('documentsContent').classList.remove('active');
+        document.getElementById('documentDetailContent').classList.remove('active');
+
+        document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+        document.getElementById('membersMenuToggle').classList.add('active');
+    }
+
+    function showDocuments() {
+        document.getElementById('documentsContent').classList.add('active');
+        document.getElementById('dashboardContent').classList.remove('active');
+        document.getElementById('membersContent').classList.remove('active');
+        document.getElementById('documentDetailContent').classList.remove('active');
+
+        document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+        document.getElementById('documentsMenuToggle').classList.add('active');
+    }
+
+    function showDocumentDetail(id) {
+        const doc = documents.find(d => d.id === id);
+        if (!doc) return;
+
+        const detailContainer = document.getElementById('documentDetailContent');
+        
+        const ngay = doc.ngaybanhanh ? new Date(doc.ngaybanhanh).toLocaleDateString('vi-VN') : 'Chưa có';
+        
+        const loaiText = {
+            'dinhky': 'Nghị quyết định kỳ',
+            'chuyende': 'Nghị quyết chuyên đề',
+            'quytrinh': 'Quy trình xử lý',
+            'luutru': 'Kho lưu trữ'
+        };
+        
+        const loaiClass = {
+            'dinhky': 'badge-dinhky',
+            'chuyende': 'badge-chuyende',
+            'quytrinh': 'badge-quytrinh',
+            'luutru': 'badge-luutru'
+        };
+        
+        const trangthaiText = {
+            'banhanh': 'Đã ban hành',
+            'chopheduyet': 'Chờ phê duyệt',
+            'dangxuly': 'Đang xử lý',
+            'luutru': 'Lưu trữ'
+        };
+        
+        let filesHtml = '';
+        if (doc.files && doc.files.length > 0) {
+            filesHtml = '<div class="attachment-list"><h4><i class="fas fa-paperclip"></i> File đính kèm</h4>';
+            doc.files.forEach(file => {
+                const size = formatFileSize(file.size);
+                filesHtml += `
+                    <div class="attachment-item">
+                        <div class="attachment-info">
+                            <i class="fas ${getFileIcon(file.type)}"></i>
+                            <div>
+                                <span class="attachment-name">${file.name}</span>
+                                <span class="attachment-size">${size}</span>
+                            </div>
+                        </div>
+                        <button class="attachment-download" onclick="downloadFile('${file.name}')">
+                            <i class="fas fa-download"></i> Tải về
+                        </button>
+                    </div>
+                `;
+            });
+            filesHtml += '</div>';
+        }
+        
+        detailContainer.innerHTML = `
+            <div class="dashboard-header">
+                <div class="title-section">
+                    <h2>CHI TIẾT VĂN BẢN</h2>
+                    <p>${doc.tieude}</p>
+                </div>
+                <div class="action-buttons">
+                    <button class="action-btn secondary" onclick="showDocuments()">
+                        <i class="fas fa-arrow-left"></i> Quay lại
+                    </button>
+                    <button class="action-btn primary" onclick="editDocument(${doc.id})">
+                        <i class="fas fa-edit"></i> Chỉnh sửa
+                    </button>
+                </div>
+            </div>
+            
+            <div class="document-detail">
+                <div class="document-header">
+                    <h2>${doc.tieude}</h2>
+                    <span class="badge ${loaiClass[doc.loai]}" style="padding: 6px 12px;">${loaiText[doc.loai]}</span>
+                </div>
+                
+                <div class="document-meta-info">
+                    <div class="meta-item">
+                        <span class="meta-label">Số hiệu</span>
+                        <span class="meta-value">${doc.sohieu}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Ngày ban hành</span>
+                        <span class="meta-value">${ngay}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Người ký</span>
+                        <span class="meta-value">${doc.nguoiky || 'Chưa có'}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Trạng thái</span>
+                        <span class="meta-value">${trangthaiText[doc.trangthai] || ''}</span>
+                    </div>
+                </div>
+                
+                <div class="document-content">
+                    <h3>Nội dung văn bản</h3>
+                    <p>${doc.noidungchitiet || doc.noidung || 'Chưa có nội dung'}</p>
+                </div>
+                
+                ${filesHtml}
+            </div>
+        `;
+        
+        detailContainer.classList.add('active');
+        document.getElementById('documentsContent').classList.remove('active');
+        document.getElementById('dashboardContent').classList.remove('active');
+        document.getElementById('membersContent').classList.remove('active');
+    }
+
+    // ===== MEMBER FUNCTIONS =====
+    function loadSampleData() {
+        members = getSampleMembers();
+        documents = getSampleDocuments();
+        filterMembersByBranch('all');
+        filterDocumentsByType('dinhky');
+        updateDashboardStats();
+    }
+
+    function filterMembersByBranch(branch) {
+        let filtered = members;
+        if (branch !== 'all') {
+            filtered = members.filter(m => m.branch === branch);
+        }
+        renderMembersTable(filtered);
+    }
+
+    function renderMembersTable(data) {
+        const tbody = document.getElementById('membersTableBody');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+        
+        data.forEach((member, index) => {
+            const row = document.createElement('tr');
+            
+            const dob = member.dob ? new Date(member.dob).toLocaleDateString('vi-VN') : '';
+            const gender = member.gender || 'Nam';
+            
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td class="member-photo-cell">
+                    <div class="member-photo ${member.photo ? 'has-image' : ''}" onclick="viewPhoto(${member.id})">
+                        ${member.photo ? 
+                            `<img src="${member.photo}" alt="${member.name}">` : 
+                            `<div class="photo-placeholder"><i class="fas fa-user"></i></div>`
+                        }
+                    </div>
+                </td>
+                <td>
+                    <div class="member-name">${member.name || ''}</div>
+                    <div class="member-info">${gender} - ${dob}</div>
+                </td>
+                <td class="position-cell">
+                    ${member.chinhquyen ? `<span class="position-badge badge-chinhquyen">${member.chinhquyen}</span>` : '-'}
+                </td>
+                <td class="position-cell">
+                    ${member.dang ? `<span class="position-badge badge-dang">${member.dang}</span>` : '-'}
+                </td>
+                <td class="position-cell">
+                    ${member.congdoan ? `<span class="position-badge badge-congdoan">${member.congdoan}</span>` : '-'}
+                </td>
+                <td class="position-cell">
+                    ${member.doan ? `<span class="position-badge badge-doan">${member.doan}</span>` : '-'}
+                </td>
+                <td>${member.branch || ''}</td>
+                <td class="action-cell">
+                    <button class="action-btn-sm view" onclick="viewMember(${member.id})" title="Xem chi tiết"><i class="fas fa-eye"></i></button>
+                    <button class="action-btn-sm edit" onclick="editMember(${member.id})" title="Chỉnh sửa"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn-sm delete" onclick="deleteMember(${member.id})" title="Xóa"><i class="fas fa-trash"></i></button>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        const tableInfo = document.getElementById('tableInfo');
+        if (tableInfo) {
+            tableInfo.innerHTML = `Hiển thị 1-${data.length} của ${members.length} đảng viên`;
+        }
+    }
+
+    function filterDocumentsByType(type) {
+        const filtered = documents.filter(doc => doc.loai === type);
+        renderDocumentsTable(filtered);
+    }
+
+    function filterDocumentsByStatus(status) {
+        const filtered = documents.filter(doc => doc.trangthai === status);
+        renderDocumentsTable(filtered);
+    }
+
+    function renderDocumentsTable(data) {
+        const tbody = document.getElementById('documentsTableBody');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+        
+        data.forEach((doc, index) => {
+            const row = document.createElement('tr');
+            row.setAttribute('onclick', `showDocumentDetail(${doc.id})`);
+            
+            const ngay = doc.ngaybanhanh ? new Date(doc.ngaybanhanh).toLocaleDateString('vi-VN') : 'Chưa có';
+            
+            const loaiClasses = {
+                'dinhky': 'badge-dinhky',
+                'chuyende': 'badge-chuyende',
+                'quytrinh': 'badge-quytrinh',
+                'luutru': 'badge-luutru'
+            };
+            
+            const loaiText = {
+                'dinhky': 'Định kỳ',
+                'chuyende': 'Chuyên đề',
+                'quytrinh': 'Quy trình',
+                'luutru': 'Lưu trữ'
+            };
+            
+            const trangthaiText = {
+                'banhanh': 'Đã ban hành',
+                'chopheduyet': 'Chờ duyệt',
+                'dangxuly': 'Đang xử lý',
+                'luutru': 'Lưu trữ'
+            };
+            
+            const filesHtml = doc.files && doc.files.length > 0 
+                ? `<span class="file-attachment"><i class="fas fa-paperclip"></i> ${doc.files.length}</span>`
+                : '<span class="file-attachment" style="opacity: 0.5;"><i class="fas fa-paperclip"></i> 0</span>';
+            
+            row.innerHTML = `
+                <td><strong>${doc.sohieu || ''}</strong></td>
+                <td>
+                    <div class="document-title">${doc.tieude || ''}</div>
+                    <div class="document-meta">${doc.noidung ? doc.noidung.substring(0, 40) + '...' : ''}</div>
+                </td>
+                <td><span class="badge ${loaiClasses[doc.loai]}">${loaiText[doc.loai] || ''}</span></td>
+                <td>${ngay}</td>
+                <td>${doc.nguoiky || 'Chưa có'}</td>
+                <td>${filesHtml}</td>
+                <td>${trangthaiText[doc.trangthai] || ''}</td>
+                <td class="action-cell" onclick="event.stopPropagation()">
+                    <button class="action-btn-sm view" onclick="showDocumentDetail(${doc.id})" title="Xem chi tiết"><i class="fas fa-eye"></i></button>
+                    <button class="action-btn-sm edit" onclick="editDocument(${doc.id})" title="Chỉnh sửa"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn-sm delete" onclick="deleteDocument(${doc.id})" title="Xóa"><i class="fas fa-trash"></i></button>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        const documentTableInfo = document.getElementById('documentTableInfo');
+        if (documentTableInfo) {
+            documentTableInfo.innerHTML = `Hiển thị 1-${data.length} của ${data.length} văn bản`;
+        }
+    }
+
+    // ===== MODAL FUNCTIONS =====
+    function openAddMemberModal() {
+        currentMemberId = null;
+        const modalTitle = document.getElementById('modalTitle');
+        if (modalTitle) {
+            modalTitle.innerHTML = '<i class="fas fa-user-plus"></i> THÊM ĐẢNG VIÊN MỚI';
+        }
+        resetMemberForm();
+        removePhoto();
+        document.getElementById('memberModal').classList.add('active');
+    }
+
+    function openAddDocumentModal() {
+        currentDocumentId = null;
+        const modalTitle = document.getElementById('documentModalTitle');
+        if (modalTitle) {
+            modalTitle.innerHTML = '<i class="fas fa-file-alt"></i> ĐĂNG VĂN BẢN MỚI';
+        }
+        resetDocumentForm();
+        currentFiles = [];
+        updateFileList();
+        document.getElementById('documentModal').classList.add('active');
+    }
+
+    function editMember(id) {
+        const member = members.find(m => m.id === id);
+        if (!member) return;
+        
+        currentMemberId = id;
+        const modalTitle = document.getElementById('modalTitle');
+        if (modalTitle) {
+            modalTitle.innerHTML = '<i class="fas fa-edit"></i> CHỈNH SỬA ĐẢNG VIÊN';
+        }
+        
+        document.getElementById('memberName').value = member.name || '';
+        document.getElementById('memberDob').value = member.dob || '';
+        document.getElementById('memberChinhquyen').value = member.chinhquyen || '';
+        document.getElementById('memberDang').value = member.dang || '';
+        document.getElementById('memberCongdoan').value = member.congdoan || '';
+        document.getElementById('memberDoan').value = member.doan || '';
+        document.getElementById('memberBranch').value = member.branch || 'Văn phòng Trung tâm';
+        document.getElementById('memberPartyDate').value = member.partyDate || '';
+        
+        removePhoto();
+        if (member.photo) {
+            currentPhotoData = member.photo;
+            const preview = document.getElementById('photoPreview');
+            const img = document.getElementById('photoImage');
+            img.src = member.photo;
+            preview.classList.add('has-image');
+            const photoInfo = document.getElementById('photoInfo');
+            if (photoInfo) {
+                photoInfo.innerHTML = '<i class="fas fa-check-circle" style="color: #28a745;"></i> Đã có ảnh';
+            }
+        }
+        
+        document.getElementById('memberModal').classList.add('active');
+    }
+
+    function editDocument(id) {
+        const doc = documents.find(d => d.id === id);
+        if (!doc) return;
+        
+        currentDocumentId = id;
+        const modalTitle = document.getElementById('documentModalTitle');
+        if (modalTitle) {
+            modalTitle.innerHTML = '<i class="fas fa-edit"></i> CHỈNH SỬA VĂN BẢN';
+        }
+        
+        document.getElementById('docSoHieu').value = doc.sohieu || '';
+        document.getElementById('docLoai').value = doc.loai || 'dinhky';
+        document.getElementById('docTieuDe').value = doc.tieude || '';
+        document.getElementById('docNgayBanHanh').value = doc.ngaybanhanh || new Date().toISOString().split('T')[0];
+        document.getElementById('docNguoiKy').value = doc.nguoiky || '';
+        document.getElementById('docNoiDung').value = doc.noidung || '';
+        document.getElementById('docNoiDungChiTiet').value = doc.noidungchitiet || '';
+        document.getElementById('docTrangThai').value = doc.trangthai || 'banhanh';
+        
+        currentFiles = doc.files ? [...doc.files] : [];
+        updateFileList();
+        
+        document.getElementById('documentModal').classList.add('active');
+    }
+
+    function viewMember(id) {
+        const member = members.find(m => m.id === id);
+        if (member) {
+            const info = `THÔNG TIN ĐẢNG VIÊN\n\n` +
+                `Họ tên: ${member.name}\n` +
+                `Ngày sinh: ${member.dob ? new Date(member.dob).toLocaleDateString('vi-VN') : ''}\n` +
+                `Chính quyền: ${member.chinhquyen || 'Không'}\n` +
+                `Đảng: ${member.dang || 'Không'}\n` +
+                `Công đoàn: ${member.congdoan || 'Không'}\n` +
+                `Đoàn TN: ${member.doan || 'Không'}\n` +
+                `Chi bộ: ${member.branch}\n` +
+                `Ngày vào Đảng: ${member.partyDate ? new Date(member.partyDate).toLocaleDateString('vi-VN') : ''}`;
+            alert(info);
+        }
+    }
+
+    function deleteMember(id) {
+        if (confirm('Bạn có chắc chắn muốn xóa đảng viên này?')) {
+            members = members.filter(m => m.id !== id);
+            filterMembersByBranch(currentBranch);
+            updateDashboardStats();
+            alert('Đã xóa đảng viên thành công');
+        }
+    }
+
+    function deleteDocument(id) {
+        if (confirm('Bạn có chắc chắn muốn xóa văn bản này?')) {
+            documents = documents.filter(d => d.id !== id);
+            filterDocumentsByType(currentDocType);
+            updateDashboardStats();
+            alert('Đã xóa văn bản thành công');
+        }
+    }
+
+    function viewPhoto(id) {
+        const member = members.find(m => m.id === id);
+        if (member && member.photo) {
+            window.open(member.photo, '_blank');
+        } else {
+            alert('Đảng viên chưa có ảnh');
+        }
+    }
+
+    function saveMember() {
+        const name = document.getElementById('memberName').value.trim();
+        if (!name) {
+            alert('Vui lòng nhập họ tên');
+            return;
+        }
+        
+        const memberData = {
+            id: currentMemberId || Date.now(),
+            name: name,
+            dob: document.getElementById('memberDob').value,
+            chinhquyen: document.getElementById('memberChinhquyen').value,
+            dang: document.getElementById('memberDang').value,
+            congdoan: document.getElementById('memberCongdoan').value,
+            doan: document.getElementById('memberDoan').value,
+            branch: document.getElementById('memberBranch').value,
+            partyDate: document.getElementById('memberPartyDate').value,
+            gender: 'Nam',
+            photo: currentPhotoData || null
+        };
+        
+        if (currentMemberId) {
+            const index = members.findIndex(m => m.id === currentMemberId);
+            if (index !== -1) {
+                members[index] = { ...members[index], ...memberData };
+            }
+            alert('Đã cập nhật thông tin đảng viên thành công');
+        } else {
+            members.push(memberData);
+            alert('Đã thêm đảng viên mới thành công');
+        }
+        
+        filterMembersByBranch(currentBranch);
+        updateDashboardStats();
+        closeMemberModal();
+    }
+
+    function saveDocument() {
+        const sohieu = document.getElementById('docSoHieu').value.trim();
+        const tieude = document.getElementById('docTieuDe').value.trim();
+        
+        if (!sohieu) {
+            alert('Vui lòng nhập số hiệu văn bản');
+            return;
+        }
+        
+        if (!tieude) {
+            alert('Vui lòng nhập tiêu đề văn bản');
+            return;
+        }
+        
+        const docData = {
+            id: currentDocumentId || Date.now(),
+            sohieu: sohieu,
+            loai: document.getElementById('docLoai').value,
+            tieude: tieude,
+            ngaybanhanh: document.getElementById('docNgayBanHanh').value,
+            nguoiky: document.getElementById('docNguoiKy').value,
+            noidung: document.getElementById('docNoiDung').value,
+            noidungchitiet: document.getElementById('docNoiDungChiTiet').value,
+            files: currentFiles,
+            trangthai: document.getElementById('docTrangThai').value
+        };
+        
+        if (currentDocumentId) {
+            const index = documents.findIndex(d => d.id === currentDocumentId);
+            if (index !== -1) {
+                documents[index] = { ...documents[index], ...docData };
+            }
+            alert('Đã cập nhật văn bản thành công');
+        } else {
+            documents.push(docData);
+            alert('Đã thêm văn bản mới thành công');
+        }
+        
+        filterDocumentsByType(currentDocType);
+        updateDashboardStats();
+        closeDocumentModal();
+    }
+
+    function closeMemberModal() {
+        document.getElementById('memberModal').classList.remove('active');
+    }
+
+    function closeDocumentModal() {
+        document.getElementById('documentModal').classList.remove('active');
+    }
+
+    // ===== FORM RESET =====
+    function resetMemberForm() {
+        document.getElementById('memberName').value = '';
+        document.getElementById('memberDob').value = '';
+        document.getElementById('memberChinhquyen').value = '';
+        document.getElementById('memberDang').value = '';
+        document.getElementById('memberCongdoan').value = '';
+        document.getElementById('memberDoan').value = '';
+        document.getElementById('memberBranch').value = 'Văn phòng Trung tâm';
+        document.getElementById('memberPartyDate').value = '';
+    }
+
+    function resetDocumentForm() {
+        document.getElementById('docSoHieu').value = '';
+        document.getElementById('docLoai').value = 'dinhky';
+        document.getElementById('docTieuDe').value = '';
+        document.getElementById('docNgayBanHanh').value = new Date().toISOString().split('T')[0];
+        document.getElementById('docNguoiKy').value = '';
+        document.getElementById('docNoiDung').value = '';
+        document.getElementById('docNoiDungChiTiet').value = '';
+        document.getElementById('docTrangThai').value = 'banhanh';
+    }
+
+    // ===== PHOTO UPLOAD HANDLERS =====
+    function handlePhotoUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) {
+            alert('File ảnh không được vượt quá 2MB');
+            return;
+        }
+
+        if (!file.type.match('image.*')) {
+            alert('Chỉ chấp nhận file ảnh (JPG, PNG)');
+            return;
+        }
+
+        currentPhotoFile = file;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            currentPhotoData = event.target.result;
+            
+            const preview = document.getElementById('photoPreview');
+            const img = document.getElementById('photoImage');
+            
+            img.src = event.target.result;
+            preview.classList.add('has-image');
+            
+            const photoInfo = document.getElementById('photoInfo');
+            if (photoInfo) {
+                photoInfo.innerHTML = '<i class="fas fa-check-circle" style="color: #28a745;"></i> Đã chọn ảnh';
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function handleFileUpload(e) {
+        const files = Array.from(e.target.files);
+        
+        files.forEach(file => {
+            if (file.size > 20 * 1024 * 1024) {
+                alert(`File ${file.name} vượt quá 20MB`);
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                currentFiles.push({
+                    name: file.name,
+                    size: file.size,
+                    type: file.name.split('.').pop().toLowerCase(),
+                    data: event.target.result
+                });
+                updateFileList();
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        e.target.value = '';
+    }
+
+    function removePhoto() {
+        currentPhotoFile = null;
+        currentPhotoData = null;
+        document.getElementById('photoUpload').value = '';
+        
+        const preview = document.getElementById('photoPreview');
+        preview.classList.remove('has-image');
+        document.getElementById('photoImage').src = '#';
+        
+        const photoInfo = document.getElementById('photoInfo');
+        if (photoInfo) {
+            photoInfo.innerHTML = '<i class="fas fa-info-circle"></i> JPG, PNG (tối đa 2MB)';
+        }
+    }
+
+    function removeFile(index) {
+        currentFiles.splice(index, 1);
+        updateFileList();
+    }
+
+    function updateFileList() {
+        const fileList = document.getElementById('fileList');
+        if (!fileList) return;
+
+        fileList.innerHTML = '';
+        
+        if (currentFiles.length === 0) {
+            fileList.innerHTML = '<p style="color: var(--text-light); text-align: center;">Chưa có file đính kèm</p>';
+            return;
+        }
+        
+        currentFiles.forEach((file, index) => {
+            const size = formatFileSize(file.size);
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <div class="file-item-info">
+                    <i class="fas ${getFileIcon(file.type)}"></i>
+                    <span class="file-item-name">${file.name}</span>
+                    <span class="file-item-size">${size}</span>
+                </div>
+                <i class="fas fa-times file-item-remove" onclick="removeFile(${index})"></i>
+            `;
+            fileList.appendChild(fileItem);
+        });
+    }
+
+    // ===== SEARCH HANDLERS =====
+    function handleMemberSearch(e) {
+        const searchText = e.target.value.toLowerCase().trim();
+        
+        if (searchText === '') {
+            filterMembersByBranch(currentBranch);
+            return;
+        }
+        
+        const filtered = members.filter(member => 
+            member.name.toLowerCase().includes(searchText) ||
+            (member.chinhquyen && member.chinhquyen.toLowerCase().includes(searchText)) ||
+            (member.dang && member.dang.toLowerCase().includes(searchText)) ||
+            (member.branch && member.branch.toLowerCase().includes(searchText))
+        );
+        
+        renderMembersTable(filtered);
+    }
+
+    function handleDocumentSearch(e) {
+        const searchText = e.target.value.toLowerCase().trim();
+        
+        if (searchText === '') {
+            filterDocumentsByType(currentDocType);
+            return;
+        }
+        
+        const filtered = documents.filter(doc => 
+            doc.tieude.toLowerCase().includes(searchText) ||
+            doc.sohieu.toLowerCase().includes(searchText) ||
+            (doc.noidung && doc.noidung.toLowerCase().includes(searchText))
+        );
+        
+        renderDocumentsTable(filtered);
+    }
+
+    function handleDocTypeFilter(e) {
+        const value = e.target.value;
+        if (value === 'all') {
+            renderDocumentsTable(documents);
+        } else {
+            filterDocumentsByType(value);
+        }
+    }
+
+    // ===== UTILITY FUNCTIONS =====
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function getFileIcon(type) {
+        const icons = {
+            'pdf': 'fa-file-pdf',
+            'doc': 'fa-file-word',
+            'docx': 'fa-file-word',
+            'xls': 'fa-file-excel',
+            'xlsx': 'fa-file-excel',
+            'jpg': 'fa-file-image',
+            'jpeg': 'fa-file-image',
+            'png': 'fa-file-image',
+            'txt': 'fa-file-alt'
+        };
+        return icons[type] || 'fa-file';
+    }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    function updateDashboardStats() {
+        const totalMembers = members.length;
+        const totalDocs = documents.length;
+        const dinhkyDocs = documents.filter(d => d.loai === 'dinhky').length;
+        const pendingDocs = documents.filter(d => d.trangthai === 'chopheduyet').length;
+        const chuyendeDocs = documents.filter(d => d.loai === 'chuyende').length;
+        
+        const totalDocsEl = document.getElementById('totalDocuments');
+        const dinhkyDocsEl = document.getElementById('dinhkyDocs');
+        const chuyendeDocsEl = document.getElementById('chuyendeDocs');
+        const pendingDocsEl = document.getElementById('pendingDocs');
+        const memberStatsEl = document.getElementById('memberStats');
+        const moduleDocStatsEl = document.getElementById('moduleDocStats');
+        
+        if (totalDocsEl) totalDocsEl.innerText = totalDocs;
+        if (dinhkyDocsEl) dinhkyDocsEl.innerText = dinhkyDocs;
+        if (chuyendeDocsEl) chuyendeDocsEl.innerText = chuyendeDocs;
+        if (pendingDocsEl) pendingDocsEl.innerText = pendingDocs;
+        if (memberStatsEl) memberStatsEl.innerHTML = `${totalMembers} đảng viên`;
+        if (moduleDocStatsEl) moduleDocStatsEl.innerHTML = `${totalDocs} văn bản`;
+        
+        updateActivityList();
+    }
+
+    function updateActivityList() {
+        const activityList = document.getElementById('dashboardActivityList');
+        if (!activityList) return;
+
+        activityList.innerHTML = '';
+        
+        const activities = [];
+        
+        members.slice(0, 2).forEach(m => {
+            activities.push({
+                icon: 'fa-user-plus',
+                title: 'Thêm đảng viên mới',
+                desc: `Đồng chí ${m.name}`,
+                time: 'Vừa xong'
+            });
+        });
+        
+        documents.slice(0, 2).forEach(d => {
+            const ngay = d.ngaybanhanh ? new Date(d.ngaybanhanh).toLocaleDateString('vi-VN') : '';
+            activities.push({
+                icon: 'fa-file-alt',
+                title: d.tieude,
+                desc: `${d.sohieu} - ${ngay}`,
+                time: 'Gần đây'
+            });
+        });
+        
+        if (activities.length === 0) {
+            activities.push({
+                icon: 'fa-info-circle',
+                title: 'Chào mừng bạn đến với hệ thống',
+                desc: 'Quản lý công tác Đảng phiên bản 2.0',
+                time: 'Bây giờ'
+            });
+        }
+        
+        activities.slice(0, 3).forEach(act => {
+            const item = document.createElement('div');
+            item.className = 'activity-item';
+            item.innerHTML = `
+                <div class="activity-icon"><i class="fas ${act.icon}"></i></div>
+                <div class="activity-content">
+                    <div class="activity-title">${act.title}</div>
+                    <div class="activity-desc">${act.desc}</div>
+                </div>
+                <div class="activity-time">${act.time}</div>
+            `;
+            activityList.appendChild(item);
+        });
+    }
+
+    // ===== SAMPLE DATA =====
+    function getSampleMembers() {
+        return [
+            {
+                id: 1,
+                name: 'Vũ Nam Thắng',
+                gender: 'Nam',
+                dob: '1975-05-15',
+                chinhquyen: 'Giám đốc',
+                dang: 'Bí thư Đảng ủy',
+                congdoan: 'Ủy viên BCH',
+                doan: '',
+                branch: 'Văn phòng Trung tâm',
+                partyDate: '2000-05-15',
+                photo: null
+            },
+            {
+                id: 2,
+                name: 'Hồ Xuân Hoà',
+                gender: 'Nam',
+                dob: '1978-08-20',
+                chinhquyen: 'Phó Giám đốc',
+                dang: 'Phó Bí thư',
+                congdoan: 'Chủ tịch CĐ',
+                doan: '',
+                branch: 'Văn phòng Trung tâm',
+                partyDate: '2002-08-20',
+                photo: null
+            },
+            {
+                id: 3,
+                name: 'Trần Thị Lan',
+                gender: 'Nữ',
+                dob: '1985-03-10',
+                chinhquyen: 'Trưởng phòng',
+                dang: 'Đảng viên',
+                congdoan: 'Trưởng ban Nữ công',
+                doan: 'Bí thư Đoàn',
+                branch: 'Văn phòng Trung tâm',
+                partyDate: '2010-03-10',
+                photo: null
+            },
+            {
+                id: 4,
+                name: 'Lê Văn Cường',
+                gender: 'Nam',
+                dob: '1980-12-02',
+                chinhquyen: 'Đội trưởng',
+                dang: 'Bí thư Chi bộ',
+                congdoan: 'Tổ trưởng CĐ',
+                doan: '',
+                branch: 'Đội Bảo trì Sân đường',
+                partyDate: '2005-12-02',
+                photo: null
+            }
+        ];
+    }
+
+    function getSampleDocuments() {
+        return [
+            {
+                id: 1,
+                sohieu: '01/NQ-ĐU',
+                tieude: 'Nghị quyết về công tác xây dựng Đảng năm 2026',
+                loai: 'dinhky',
+                ngaybanhanh: '2026-01-15',
+                nguoiky: 'Vũ Nam Thắng',
+                noidung: 'Nghị quyết về công tác xây dựng Đảng năm 2026',
+                noidungchitiet: 'Nghị quyết này đề ra các mục tiêu, nhiệm vụ trọng tâm về công tác xây dựng Đảng trong năm 2026...',
+                files: [
+                    { name: 'NQ-01-2026.pdf', size: 1240000, type: 'pdf' }
+                ],
+                trangthai: 'banhanh'
+            },
+            {
+                id: 2,
+                sohieu: '02/NQ-ĐU',
+                tieude: 'Nghị quyết về công tác cán bộ nhiệm kỳ 2025-2030',
+                loai: 'chuyende',
+                ngaybanhanh: '2026-02-20',
+                nguoiky: 'Hồ Xuân Hoà',
+                noidung: 'Nghị quyết về công tác cán bộ',
+                noidungchitiet: 'Nghị quyết này quy định về công tác quy hoạch, đào tạo, bổ nhiệm cán bộ...',
+                files: [
+                    { name: 'NQ-02-2026.pdf', size: 890000, type: 'pdf' },
+                    { name: 'PhuLuc.xlsx', size: 560000, type: 'xlsx' }
+                ],
+                trangthai: 'chopheduyet'
+            },
+            {
+                id: 3,
+                sohieu: '03/QT-ĐU',
+                tieude: 'Quy trình xử lý văn bản đến và đi',
+                loai: 'quytrinh',
+                ngaybanhanh: '2026-03-10',
+                nguoiky: 'Trần Thị Lan',
+                noidung: 'Quy trình xử lý văn bản',
+                noidungchitiet: 'Quy trình này hướng dẫn chi tiết các bước tiếp nhận, xử lý, ban hành văn bản...',
+                files: [
+                    { name: 'QT-03-2026.pdf', size: 2100000, type: 'pdf' }
+                ],
+                trangthai: 'banhanh'
+            }
+        ];
+    }
+
+    // Export functions to global scope for onclick handlers
+    window.showDocumentDetail = showDocumentDetail;
+    window.viewMember = viewMember;
+    window.editMember = editMember;
+    window.deleteMember = deleteMember;
+    window.viewPhoto = viewPhoto;
+    window.editDocument = editDocument;
+    window.deleteDocument = deleteDocument;
+    window.downloadFile = (name) => alert('Đang tải file: ' + name);
+    window.closeMemberModal = closeMemberModal;
+    window.closeDocumentModal = closeDocumentModal;
+    window.removePhoto = removePhoto;
+    window.removeFile = removeFile;
+</script>
 </body>
 </html>
+
